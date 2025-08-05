@@ -852,6 +852,7 @@ async def query_web_response(
     """
     try:
         search_response,is_summary,is_covered_urls = await query_agent(query, model, date, day)
+        search_response.append(query)
         if len(search_response) == 0:
             search_response = [query]
             logger.info(f"Search response generated for query '{query}' using pure query.")
