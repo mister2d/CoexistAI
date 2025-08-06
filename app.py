@@ -230,7 +230,7 @@ async def websearch(request: WebSearchRequest):
         split (bool, optional): Whether to split documents into chunks. Defaults to True.
 
     Returns:
-        tuple: Generated response, sources, search results, retrieved documents, and context.
+        str: Generated response to query based on the retrieved and reranked search results and sources
     """
     # You may need to adjust these arguments based on your actual setup
     # For demonstration, using None for models and embeddings
@@ -263,7 +263,7 @@ async def websummarize(request: WebSummarizeRequest):
         model (str): The model to use for summarization.
         local_mode (bool): Whether to process local documents.
     Returns:
-        dict: A dictionary containing the generated summary and sources."""
+        str:  The generated summary of the url provided to answer query"""
     try:
         result = await summary_of_url(
             query=request.query,
@@ -283,7 +283,7 @@ async def youtube_search(request: YouTubeSearchRequest):
         prompt (str): The prompt to generate a response from the transcript.
         n (int): Number of videos to summarize if search term is provided instead of URL.
     Returns:
-        dict: response from the YouTube transcripts based on the given query"""
+        str: response from the YouTube transcripts based on the given query"""
     # You may need to adjust the model argument as per your setup
     result = youtube_transcript_response(
         request.query,
@@ -307,7 +307,7 @@ async def reddit_search(request: RedditSearchRequest):
         search_query (str): Search query for Reddit posts. IF NOT SEARCHING FOR A QUERY, dont set this value, keep it ""
         sort_type (str): Sorting type for the results.
         Returns:                                            
-            dict: A dictionary containing the results of the Reddit search."""  
+            str: A response containing the summary of the Reddit search results"""  
     # You may need to adjust the model argument as per your setup
     if request.search_query:
         request.url_type = 'search'
