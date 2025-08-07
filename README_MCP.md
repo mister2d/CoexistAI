@@ -282,7 +282,8 @@ You can now run coexistai as an MCP server—**plug it into LM Studio** or any o
     {
         "mcpServers": {
              "coexistai": {
-                "url": "http://127.0.0.1:8000/mcp"
+                "url": "http://127.0.0.1:8000/mcp",
+                "timeout": 180000
         }
     }
     }
