@@ -300,6 +300,7 @@ You can now run coexistai as an MCP server—**plug it into LM Studio** or any o
 ## 🏆 Best Local Model
 
 For fastest, highest-quality local LLM results, I have personally liked following:  
-**unsloth/Qwen3-8B-GGUF** and **google/gemma-3-12b**
 
+**unsloth/Qwen3-8B-GGUF** and **google/gemma-3-12b** as lmstudio model
+for model behind MCP, prefer the model which is faster and yet good at structural output generation
 ---
