@@ -267,7 +267,7 @@ You can now run coexistai as an MCP server—**plug it into LM Studio** or any o
 
 ### How to Integrate with LM Studio
 
-1. Download lm studio> 0.3.17 (https://lmstudio.ai/docs/app)
+1. Download (latest) lm studio> 0.3.17 (https://lmstudio.ai/docs/app)
 
 2. Find the [MCP guide](https://lmstudio.ai/docs/app/plugins/mcp)
 
