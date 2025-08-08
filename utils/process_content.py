@@ -60,7 +60,7 @@ def process_content(url, content_type, content):
                 return ""
         elif 'text/html' in content_type:
             logger.info("Processing HTML content.")
-            soup = BeautifulSoup(content, 'html.parser', from_encoding="iso-8859-1",
+            soup = BeautifulSoup(content, 'lxml', from_encoding="iso-8859-1",
                                     )
             soup = clean_html(soup)
             markdown_content = markdownify(str(soup), strip=['a'])
