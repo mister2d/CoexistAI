@@ -6,10 +6,12 @@ from pydantic import BaseModel
 from utils.utils import *
 from utils.map import *
 from utils.git_utils import *
+from utils.startup_banner import display_startup_banner, display_shutdown_banner
 import subprocess
 from fastapi_mcp import FastApiMCP
 import json
 import os
+import atexit
 from model_config import *
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -37,12 +39,15 @@ cross_encoder_name = model_config.get("cross_encoder_name", "BAAI/bge-reranker-b
 
 if not is_searxng_running():
     subprocess.run([
-        "docker", "run", "--rm",
-        "-d", "-p", "30:8080",
-        "-v", f"{os.getcwd()}/searxng:/etc/searxng",
-        "-e", "BASE_URL=http://localhost:30/",
-        "-e", "INSTANCE_NAME=my-instance",
-        "searxng/searxng"
+        "docker", "run", "-d",
+        "--name", "searxng",
+        "-p", f"{PORT_NUM_SEARXNG}:8080",
+        "-v", f"{os.getcwd()}/searxng:/etc/searxng:rw",
+        "-e", f"SEARXNG_BASE_URL=http://{HOST_SEARXNG}:{PORT_NUM_SEARXNG}/",
+        "-e", f"SEARXNG_PORT={PORT_NUM_SEARXNG}",
+        "-e", f"SEARXNG_BIND_ADDRESS={HOST_SEARXNG}",
+        "--restart", "unless-stopped",
+        "searxng/searxng:latest"
     ])
 else:
     print("SearxNG docker container is already running.")
@@ -62,9 +67,12 @@ hf_embeddings, cross_encoder = load_model(embedding_model_name,
 
 text_splitter = TokenTextSplitter(chunk_size=512, chunk_overlap=128)
 
-searcher = SearchWeb(30)
+searcher = SearchWeb(PORT_NUM_SEARXNG, HOST_SEARXNG)
 date, day = get_local_data()
 app = FastAPI(title='coexistai')
+
+# Register shutdown handler
+atexit.register(display_shutdown_banner)
 
 origins = [
     "*",  # Allow all origins (use specific domains in production)
@@ -385,3 +393,6 @@ mcp = FastApiMCP(app,include_operations=['get_web_search',
                                          "get_website_structure"
                                          ],)
 mcp.mount()
+
+# Display startup banner when the app starts
+display_startup_banner(host=HOST_APP, port=PORT_NUM_APP)
