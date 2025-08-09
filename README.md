@@ -43,6 +43,7 @@ CoexistAI is a modular, developer-friendly research assistant framework. It enab
 2. **Configure your model and embedding settings:**
    
    - Edit `model_config.py` to set your preferred LLM and embedding model.
+   - Edit above file to set your preferred SearxNG host and port (if needed)
    - Add LLM and Embedder API Key (for google mode both would be same)
    - Example (for full local mode):
     ```py

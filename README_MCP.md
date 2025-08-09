@@ -32,6 +32,7 @@
 2. **Configure your model and embedding settings:**
    
    - Edit `model_config.py` to set your preferred LLM and embedding model.
+   - Edit above file to set your preferred SearxNG host and port (if needed)
    - Add LLM and Embedder API Key (for google mode both would be same)
    - Example (for full local mode):
     ```py
@@ -303,4 +304,6 @@ For fastest, highest-quality local LLM results, I have personally liked followin
 
 **unsloth/Qwen3-8B-GGUF** and **google/gemma-3-12b** as lmstudio model
 for model behind MCP, prefer the model which is faster and yet good at structural output generation
+I am working towards making system work with local smaller models which are not so great.
+
 ---
