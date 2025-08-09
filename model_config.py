@@ -22,6 +22,13 @@ Attributes:
             - "embed_mode" (str): Embedding mode or backend.
             - "cross_encoder_name" (str): Name of the cross-encoder model for reranking.
 """
+############## PORT and HOST SETTINGS
+PORT_NUM_SEARXNG = 8085
+PORT_NUM_APP = 8000
+HOST_APP = "localhost"
+HOST_SEARXNG = "localhost"
+###############
+
 ## USER INPUTS NEEDED
 #for open source model you can replace it by 'DUMMY', else respective providers 
 llm_api_key = os.environ.get('GOOGLE_API_KEY', 'DUMMY') 
