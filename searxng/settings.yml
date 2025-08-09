@@ -50,10 +50,10 @@ search:
   #   - it-IT
   #   - fr
   #   - fr-BE
-  # ban time in seconds after engine errors
-  ban_time_on_fail: 5
-  # max ban time in seconds after engine errors
-  max_ban_time_on_fail: 120
+  # Optimized ban times for faster recovery
+  ban_time_on_fail: 3
+  # Reduce max ban time for quicker engine recovery
+  max_ban_time_on_fail: 60
   suspended_times:
     # Engine suspension time after error (in seconds; set to 0 to disable)
     # For error "Access denied" and "HTTP error [402, 403]"
@@ -90,8 +90,8 @@ server:
   secret_key: "your_secret_key"  # Is overwritten by ${SEARXNG_SECRET}
   # Proxying image results through searx
   image_proxy: false
-  # 1.0 and 1.1 are supported
-  http_protocol_version: "1.0"
+  # Use HTTP/1.1 for better performance and keep-alive support
+  http_protocol_version: "1.1"
   # POST queries are more secure as they don't show up in history but may cause
   # problems when using Firefox containers
   method: "POST"
@@ -102,9 +102,10 @@ server:
     Referrer-Policy: no-referrer
 
 redis:
+  # Enable Redis for caching to significantly improve performance
   # URL to connect redis database. Is overwritten by ${SEARXNG_REDIS_URL}.
   # https://docs.searxng.org/admin/settings/settings_redis.html#settings-redis
-  url: false
+  url: "redis://localhost:6379/0"
 
 ui:
   # Custom static path - leave it blank if you didn't change
@@ -162,10 +163,10 @@ ui:
 # communication with search engines
 #
 outgoing:
-  # default timeout in seconds, can be override by engine
-  request_timeout: 3.0
-  # the maximum timeout in seconds
-  # max_request_timeout: 10.0
+  # Optimized timeout settings for better performance
+  request_timeout: 2.0
+  # Reduce maximum timeout to prevent slow engines from blocking
+  max_request_timeout: 8.0
   # suffix of searx_useragent, could contain information like an email address
   # to the administrator
   useragent_suffix: ""
