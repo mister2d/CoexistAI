@@ -28,6 +28,12 @@ from youtube_search import YoutubeSearch
 from markitdown import MarkItDown
 from pathlib import Path
 from rank_bm25 import BM25Okapi
+from utils.retriever_utils import create_vectorstore_async, cleanup_old_collections_async
+import hashlib
+import time
+import logging
+from utils.profiler_utils import WebSearchProfiler, get_profiler, set_profiler
+
 
 
 import chromadb
@@ -61,14 +67,15 @@ class SearchWeb:
         searcher (SearxSearchWrapper): An instance of SearxSearchWrapper for querying search engines.
     """
 
-    def __init__(self, port):
+    def __init__(self, port, host="localhost"):
         """
         Initializes the SearchWeb class with the given Searx server port.
 
         Args:
             port (int): The port number for Searx search service.
+            host (str): The host address for Searx search service.
         """
-        self.searcher = SearxSearchWrapper(searx_host=f"http://localhost:{port}")
+        self.searcher = SearxSearchWrapper(searx_host=f"http://{host}:{port}")
 
     def query_search(self, query, engines=['google'], num_results=5):
         """
@@ -193,12 +200,33 @@ async def process_url(
     Returns:
         tuple: Processed context, retrieved documents, document list, and URL.
     """
+    # Create a mini-profiler for this URL processing
+    url_start_time = time.time()
+    logger.info(f"Starting process_url for: {url}")
+    
+    # Start URL tracking in profiler
+    profiler = get_profiler()
+    if profiler:
+        profiler.start_url_processing(url)
+    
     try:
         # Use async document retrieval
+        doc_retrieval_start = time.time()
         docs = await urls_to_docs([url], local_mode=local_mode, split=split)
-        logger.info(f"Processed {len(docs)} docs for URL: {url}")
+        doc_retrieval_time = time.time() - doc_retrieval_start
+        logger.info(f"Processed {len(docs)} docs for URL: {url} in {doc_retrieval_time:.3f}s")
     except Exception as e:
         logger.error(f"Error processing {url}: {e}")
+        # Track failed URL processing
+        profiler = get_profiler()
+        if profiler:
+            profiler.end_url_processing(
+                url=url, 
+                docs_count=0, 
+                context_length=0, 
+                status="failed", 
+                error=str(e)
+            )
         return None, None, None, url
 
     for i, d in enumerate(docs):
@@ -209,6 +237,7 @@ async def process_url(
 
     # Special handling for Reddit and YouTube URLs
     if 'reddit.com' in url:
+        logger.info(f"🔍 DEBUG: Reddit URL detected in process_url: {url}")
         try:
             logger.info(f"Processing Reddit URL with wait: {url}")
             await asyncio.sleep(random.randint(1, 3))  # Async sleep to avoid rate limiting
@@ -223,6 +252,7 @@ async def process_url(
         except Exception as e:
             logger.error(f"Error processing Reddit URL {url}: {e}")
     if 'youtube' in url:
+        logger.info("YouTube URL detected")
         try:
             logger.info(f"Processing YouTube URL: {url}")
             response = youtube_transcript_response(url, f"Summarise for {subquery}", model)
@@ -240,27 +270,38 @@ async def process_url(
 
     # Log start of encoding
     encoding_start = time.time()
-    logger.info(f"Encoding start for URL: {url}")
+    logger.info(f"🔍 Encoding start for URL: {url}")
 
     try:
-        chromadb.api.client.SharedSystemClient.clear_system_cache()
-        vectorstore = Chroma.from_documents(
-            documents=docs,
-            collection_name="rag-chroma",
-            embedding=hf_embeddings,
-        )
-        sem_retriever = vectorstore.as_retriever(search_kwargs={"k": top_k})
-        bm25_retriever = BM25Retriever.from_documents(docs)
-        bm25_retriever.k = top_k
-        ensemble_retriever = EnsembleRetriever(
-            retrievers=[bm25_retriever, sem_retriever], weights=[0.25, 0.75]
+        # Create unique collection name with timestamp for better isolation
+        timestamp = str(int(time.time() * 1000))  # millisecond precision
+        collection_name = f"rag-chroma-{hashlib.md5(f'{url}_{subquery}_{timestamp}'.encode()).hexdigest()[:8]}"
+        
+        # Use optimized async vectorstore creation
+        ensemble_retriever = await create_vectorstore_async(
+            docs=docs,
+            collection_name=collection_name,
+            hf_embeddings=hf_embeddings,
+            top_k=top_k,
+            ensemble_weights=[0.25, 0.75]
         )
     except Exception as e:
         logger.error(f"Error setting up retrievers for {url}: {e}")
+        # Track failed URL processing
+        profiler = get_profiler()
+        if profiler:
+            profiler.end_url_processing(
+                url=url, 
+                docs_count=len(docs) if 'docs' in locals() else 0, 
+                context_length=0, 
+                status="failed", 
+                error=str(e)
+            )
         return None, None, None, url
 
     encoding_end = time.time()
-    logger.info(f"Encoding end for URL: {url}, Time taken: {encoding_end - encoding_start:.2f} seconds")
+    encoding_time = encoding_end - encoding_start
+    logger.info(f"Encoding complete for URL: {url}, Time taken: {encoding_time:.3f}s")
 
     if rerank:
         try:
@@ -281,12 +322,22 @@ async def process_url(
         query_filter = {"name": {"$in": [query]}}
         url_filter = {"name": {"$in": [url]}}
         combined_filter = {"$and": [query_filter, url_filter]}
-        retrieved_docs = ensemble_retriever.invoke(
+        retrieved_docs = await ensemble_retriever.ainvoke(
             subquery, search_kwargs={"k": top_k}, filter=combined_filter
         )
         logger.info(f"Retrieved {len(retrieved_docs)} docs for {url}")
     except Exception as e:
         logger.error(f"Error retrieving docs for {url}: {e}")
+        # Track failed URL processing
+        profiler = get_profiler()
+        if profiler:
+            profiler.end_url_processing(
+                url=url, 
+                docs_count=len(docs) if 'docs' in locals() else 0, 
+                context_length=0, 
+                status="failed", 
+                error=str(e)
+            )
         return None, None, None, url
 
     # Build context string
@@ -307,6 +358,22 @@ async def process_url(
         logger.error(f"Error building context for {url}: {e}")
         context = ''
 
+    # Log total processing time and track content for time saved calculation
+    total_processing_time = time.time() - url_start_time
+    logger.info(f"Completed process_url for {url} in {total_processing_time:.3f}s (docs: {len(docs)}, context: {len(context)} chars)")
+    
+    # Track URL content for time saved calculation and end URL tracking
+    profiler = get_profiler()
+    if profiler:
+        if context:
+            profiler.add_url_content(url, context)
+        profiler.end_url_processing(
+            url=url, 
+            docs_count=len(docs), 
+            context_length=len(context), 
+            status="success"
+        )
+    
     return context, retrieved_docs, docs, url
 
 
@@ -322,7 +389,8 @@ async def context_to_docs(
     cross_encoder=None,
     model=None,
     local_mode=False,
-    split=True
+    split=True,
+    profiler=None
 ):
     """
     Retrieves and processes documents from a list of URLs, converts them into a retrievable format.
@@ -346,6 +414,10 @@ async def context_to_docs(
         tuple: Combined context string, list of retrieved documents, and list of all processed documents.
     """
     logger.info(f"Starting async context_to_docs for {len(urls_list)} URL groups.")
+    
+    if profiler:
+        profiler.start_step("url_collection", "Collecting and preparing URLs for processing")
+    
     text_splitter = TokenTextSplitter(chunk_size=512, chunk_overlap=128)
     contexts = []
     rtr_docs = []
@@ -415,6 +487,8 @@ async def context_to_docs(
     
     if not all_tasks:
         logger.warning("No URLs to process.")
+        if profiler:
+            profiler.end_step("No URLs found to process")
         search_snippets_context = [
             f"search result:: title:{d.metadata.get('title', '')} url:{d.metadata['source'].replace('https://r.jina.ai/', '')}  \ncontent: {d.page_content}\n"
             for d in search_snippets
@@ -422,6 +496,11 @@ async def context_to_docs(
         search_snippets_context = '\n'.join(search_snippets_context)
         return search_snippets_context, [], []
 
+    if profiler:
+        profiler.end_step(f"Collected {len(all_tasks)} URL processing tasks")
+        profiler.start_step("parallel_url_processing", "Processing URLs in parallel")
+        profiler.add_metric('urls_processed', len(all_tasks))
+    
     # Execute all tasks in parallel
     logger.info(f"Processing {len(all_tasks)} URLs in parallel using asyncio.gather")
     results = await asyncio.gather(*all_tasks, return_exceptions=True)
@@ -446,6 +525,12 @@ async def context_to_docs(
                 logger.error(f"Processing error for {result['url']}: {result.get('error', 'Unknown error')}")
 
     logger.info(f"Async parallel processing complete. Successfully processed {successful_results}/{len(all_tasks)} URLs")
+    
+    if profiler:
+        profiler.end_step(f"Successfully processed {successful_results}/{len(all_tasks)} URLs")
+        profiler.add_metric('successful_urls', successful_results)
+        profiler.add_metric('failed_urls', len(all_tasks) - successful_results)
+        profiler.start_step("context_building", "Building final context from processed documents")
 
     search_snippets_context = [
         f"search result:: title:{d.metadata.get('title', '')} url:{d.metadata['source'].replace('https://r.jina.ai/', '')}  \ncontent: {d.page_content}\n"
@@ -455,6 +540,18 @@ async def context_to_docs(
     final_context = '\n\n'.join(contexts).strip() + '\n' + search_snippets_context
 
     logger.info(f"async context_to_docs complete. Total contexts: {len(contexts)}, total docs: {len(total_docs)}")
+    
+    if profiler:
+        profiler.end_step(f"Built final context with {len(final_context)} characters")
+    
+    # Periodic cleanup of old ChromaDB collections (10% chance)
+    if random.random() < 0.1:
+        try:
+            await cleanup_old_collections_async(max_collections=20)
+            logger.info("Performed periodic ChromaDB collection cleanup")
+        except Exception as e:
+            logger.warning(f"ChromaDB cleanup failed: {e}")
+    
     return final_context, rtr_docs, total_docs
 
 
@@ -645,6 +742,9 @@ def query_to_search_results(query, search_response, websearcher, num_results=3, 
             - search_results (list): The raw search results for the last query processed.
             - search_results_urls (list): A list of lists, where each sublist contains URLs from the search results of a query.
     """
+    # Start timing for search execution
+    search_start_time = time.time()
+    logger.info(f"Starting query_to_search_results for {len(search_response)} queries")
     async def perform_search_with_reachability_check(search_queries, current_num_results):
         """
         Inner async function to perform search and check URL reachability.
@@ -805,11 +905,16 @@ def query_to_search_results(query, search_response, websearcher, num_results=3, 
                 retry_count += 1
                 continue
         
-        logger.info(f"Search completed after {retry_count + 1} attempts with {len(search_snippets)} snippets")
+        # Log search completion with timing
+        search_total_time = time.time() - search_start_time
+        total_urls = sum(len(urls) for urls in search_results_urls)
+        logger.info(f"Search completed after {retry_count + 1} attempts in {search_total_time:.3f}s")
+        logger.info(f"Search metrics: {len(search_snippets)} snippets, {total_urls} URLs, {len(search_results_urls)} URL groups")
         return search_snippets, search_results, search_results_urls
         
     except Exception as e:
-        logger.error(f"Error in query_to_search_results: {e}")
+        search_total_time = time.time() - search_start_time
+        logger.error(f"Error in query_to_search_results after {search_total_time:.3f}s: {e}")
         return [], [], []
 
 
@@ -850,8 +955,14 @@ async def query_web_response(
     Returns:
         tuple: Generated response, sources, search results, retrieved documents, and context.
     """
+    # Initialize profiler and set it globally
+    profiler = WebSearchProfiler(query)
+    set_profiler(profiler)
+    
     try:
+        profiler.start_step("query_agent", "Generating search queries from user input")
         search_response,is_summary,is_covered_urls = await query_agent(query, model, date, day)
+        profiler.end_step(f"Generated {len(search_response)} search queries")
         search_response.append(query)
         if len(search_response) == 0:
             search_response = [query]
@@ -860,11 +971,14 @@ async def query_web_response(
             split=False
         search_response = [text.replace('"', '') for text in search_response]
         logger.info(f"Search phrases for query '{query}': {search_response}")
+        profiler.add_metric('search_queries_generated', len(search_response))
     except Exception as e:
         logger.error(f"Error generating search response for query '{query}': {e}")
+        profiler.end_step("Failed with error")
         return None, None, None, None, None, None, None
 
     if websearcher is None or local_mode:
+        profiler.start_step("local_document_processing", "Processing local documents")
         logger.warning("Please add list of paths as input, earlier it used to be list of list")
         all_paths=[]
         for k in document_paths:
@@ -875,9 +989,12 @@ async def query_web_response(
         search_snippets, search_results, search_results_urls = [], [], all_paths * len(search_response)
         search_snippets_orig = {}
         logger.warning("No websearcher provided; using document_paths only.")
+        profiler.end_step(f"Prepared {len(all_paths)} local paths")
     else:
+        profiler.start_step("web_search_execution", "Executing web search and URL extraction")
         try:
             extracted_urls = extract_urls_from_query(query)
+            logger.info(f"Extracted URLs from query '{query}': {extracted_urls}")
             if len(extracted_urls)>0:
                 for u in extracted_urls:
                     if ('reddit' in u) or ('youtube' in u):
@@ -885,7 +1002,7 @@ async def query_web_response(
                     else:
                         is_summary = True
                         is_covered_urls = False
-            if extract_urls_from_query(query) and not is_covered_urls:
+            if extract_urls_from_query(query) and is_covered_urls:
                 logger.info(f"Extracted URLs from query '{query}': {extract_urls_from_query(query)}")
                 search_snippets_orig = []
                 for u in extract_urls_from_query(query):
@@ -904,12 +1021,15 @@ async def query_web_response(
             except Exception as e:
                 logger.warning(f"No good searches found or error building search_snippets_orig: {e}")
             logger.info(f"Search results fetched for query '{query}'.")
+            profiler.end_step(f"Found {len(search_results_urls)} URL groups with {sum(len(urls) for urls in search_results_urls)} total URLs")
+            profiler.add_metric('urls_found', sum(len(urls) for urls in search_results_urls))
         except Exception as e:
             logger.error(f"Error fetching search results for query '{query}': {e}")
+            profiler.end_step("Failed with error")
             return None, None, None, None, None, None, None
 
     try:
-        
+        profiler.start_step("context_generation", "Processing URLs and generating context")
         context, rtr_docs, total_docs = await context_to_docs(
             search_results_urls,
             search_response,
@@ -922,11 +1042,16 @@ async def query_web_response(
             cross_encoder=cross_encoder,
             model=text_model,
             local_mode=local_mode,
-            split=split
+            split=split,
+            profiler=profiler  # Pass profiler to context_to_docs
         )
         logger.info(f"Async context generated to answer query '{query}'.")
+        profiler.end_step(f"Generated context with {len(total_docs)} total documents")
+        profiler.add_metric('docs_retrieved', len(total_docs))
+        profiler.add_metric('context_length', len(context) if context else 0)
     except Exception as e:
         logger.error(f"Error generating context for query '{query}': {e}")
+        profiler.end_step("Failed with error")
         return None, None, None, None, None, None, None
 
     try:
@@ -936,6 +1061,7 @@ async def query_web_response(
         logger.warning(f"Error logging results for query '{query}': {e}")
 
     try:
+        profiler.start_step("response_generation", "Generating final response from context")
         if not is_summary or (is_covered_urls):
             logger.info(f"Generating Answer for query '{query}' using async response gen.")
             response_1, sources = await response_gen(text_model, query, context)
@@ -944,10 +1070,15 @@ async def query_web_response(
             response_1 = await summarizer(query, total_docs, text_model, 16)
             sources = str(search_results_urls)
         logger.info(f"Async response generated for query '{query}'.")
+        profiler.end_step(f"Generated response with {len(response_1)} characters")
     except Exception as e:
         logger.error(f"Error generating async response for query '{query}': {e}")
+        profiler.end_step("Failed with error")
         return None, None, None, None, None, None, None
 
+    # Print profiling summary
+    profiler.print_summary()
+    
     return response_1, sources, search_response, search_results, rtr_docs, total_docs, context
 
 
@@ -1017,6 +1148,11 @@ async def urls_to_docs(urls, local_mode=False, split=True):
     Returns:
         list: List of processed document objects.
     """
+    # Start timing
+    urls_start_time = time.time()
+    mode_str = "local files" if local_mode else "URLs"
+    logger.info(f"🔄 Starting urls_to_docs for {len(urls)} {mode_str}")
+    
     docs = []
     if not urls:
         logger.warning("0 URLs were given to urls_to_docs.")
@@ -1056,10 +1192,28 @@ async def urls_to_docs(urls, local_mode=False, split=True):
                         doc = Document(result)
                         doc.metadata['source'] = url
                         docs.append(doc)
-                    logger.info(f"Successfully processed and added document(s) for URL: {url}")
+                    logger.info(f"✅ Successfully processed and added document(s) for URL: {url}")
+                    
+                    # Track content for time saved calculation
+                    profiler = get_profiler()
+                    if profiler:
+                        if local_mode and 'split_docs' in locals():
+                            # For local mode, track all split documents
+                            for split_doc in split_docs:
+                                profiler.add_url_content(url, split_doc.page_content)
+                        elif local_mode:
+                            # Single document in local mode
+                            profiler.add_url_content(url, result)
+                        else:
+                            # For remote mode, track the main document
+                            profiler.add_url_content(url, result)
+                            
                 except Exception as e:
                     logger.error(f"Error creating Document(s) for URL {url}: {e}")
-    logger.info(f'Total URLs processed: {len(docs)}')
+    
+    # Log completion with timing
+    urls_total_time = time.time() - urls_start_time
+    logger.info(f"urls_to_docs completed in {urls_total_time:.3f}s: {len(docs)} documents from {len(urls)} {mode_str}")
     return docs
 
 def youtube_transcript_response(query, task, model,n=3):
