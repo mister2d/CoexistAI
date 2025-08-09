@@ -221,9 +221,6 @@ async def summarizer(query, docs, llm, batch,max_docs=30,max_words_per_doc=6000)
             else:
                 summary_text = str(response)
             
-            logger.info(f"Extracted summary_text: {summary_text}")
-            logger.info(f"Summary_text type: {type(summary_text)}")
-            
             if summary_text and isinstance(summary_text, str):
                 return summary_text.strip()
             else:
