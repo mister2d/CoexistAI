@@ -96,6 +96,7 @@ def display_startup_banner(host="localhost", port=8000, mcp_port=None):
 {WHITE}   • Python Version:   {GREEN}{sys_info['python_version']}{RESET}
 {WHITE}   • Platform:         {GREEN}{sys_info['platform']}{RESET}
 {WHITE}   • Started:          {GREEN}{sys_info['startup_time']}{RESET}
+{WHITE}   • Contributor:      {GREEN}Sidhant Pravinkumar Thole{RESET}
 
 {MAGENTA}═══════════════════════════════════════════════════════════════════════════════{RESET}
 {BOLD}{CYAN}                    Ready to accelerate your research! 🎯{RESET}
