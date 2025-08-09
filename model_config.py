@@ -30,9 +30,9 @@ HOST_SEARXNG = "localhost"
 ###############
 
 ## USER INPUTS NEEDED
-#for open source model you can replace it by 'DUMMY', else respective providers 
-llm_api_key = os.environ.get('GOOGLE_API_KEY', 'DUMMY') 
-embed_api_key = os.environ.get('GOOGLE_API_KEY', 'DUMMY')
+#for open source model you can replace it by 'DUMMY' (for both llm and embed), else respective providers 
+llm_api_key = os.environ.get('GOOGLE_API_KEY', 'DUMMY') # either paste llm key, based on provider (for an instance, Google) here directly or export it in the env, else dummy for local
+embed_api_key = os.environ.get('GOOGLE_API_KEY', 'DUMMY') # either paste embeder key, based on provider (for an instance, Google) here directly or export it in the env, else dummy for local
 
 model_config = {
     # Name of the LLM model to use. For local models, use the model name served by your local server.
