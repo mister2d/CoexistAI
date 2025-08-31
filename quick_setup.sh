@@ -54,6 +54,28 @@ echo "SearxNG container started successfully!"
 echo "Installing Python dependencies..."
 pip install -r ./requirements.txt
 
+# Adding tts files
+# Check if wget is installed
+if ! command -v wget &> /dev/null; then
+  echo "wget could not be found, please install wget to continue."
+  exit 1
+fi
+
+# Download kokoro-v1.0.onnx if not present
+if [ ! -f kokoro-v1.0.onnx ]; then
+  wget https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx
+else
+  echo "kokoro-v1.0.onnx already exists, skipping download."
+fi
+
+# Download voices-v1.0.bin if not present
+if [ ! -f voices-v1.0.bin ]; then
+  wget https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
+else
+  echo "voices-v1.0.bin already exists, skipping download."
+fi
+
+
 # 8. Start the FastAPI app
 echo "Starting FastAPI app..."
 cd . || exit 1
