@@ -401,7 +401,7 @@ async def podcaster(request: PodcastRequest):
     Each sentence is spoken in the specified voice, and random pauses are added between sentences for natural flow.
     
     Args:
-        prompt: The theme or topic of the podcast episode.
+        prompt: The theme or topic of the podcast episode. You can even provide length instructions, like shorter/longer duration, tone, etc.
         text: The detailed content over which the podcast is to be made.
     Returns:
         FileResponse: The generated podcast .wav file. or str
@@ -461,6 +461,17 @@ Text: {request.text}
 
 @app.post('/basic-tts', operation_id="get_basic_tts")
 async def basic_tts(request: BasicTTSRequest):
+    """Converts input text to speech using the specified voice and language, and returns the generated audio file.
+    Args:
+        request (BasicTTSRequest): The request object containing the following fields:
+            - text (str): The text to be converted to speech.
+            - voice (str): The voice to use for speech synthesis.
+            - lang (str): The language code for speech synthesis.
+            - filename (str, optional): The output filename for the generated audio file.
+    Returns:
+        FileResponse: The generated audio file in WAV format if successful.
+        dict: An error message if text is not provided or if an exception occurs during TTS generation.
+    """
     text = request.text
     voice = request.voice
     lang = request.lang
@@ -481,8 +492,8 @@ async def basic_tts(request: BasicTTSRequest):
         )
     except Exception as e:
         return {"error": f"Error occurred while creating TTS: {e}"}
-
-
+    
+    
 mcp = FastApiMCP(app,include_operations=['get_web_search',
                                          'get_web_summarize',
                                          'get_youtube_search',
