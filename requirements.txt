@@ -38,3 +38,5 @@ langchain-groq
 youtube_transcript_api>=1.1.0
 slowapi
 charset-normalizer
+kokoro-onnx
+soundfile
