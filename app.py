@@ -8,12 +8,15 @@ from utils.map import *
 from utils.git_utils import *
 from utils.startup_banner import display_startup_banner, display_shutdown_banner
 import subprocess
+from utils.tts_utils import *
 from fastapi_mcp import FastApiMCP
 import json
 import os
 import atexit
 from model_config import *
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from uuid import uuid4
 
 
 # Use config values for model and embedding paths
@@ -148,6 +151,10 @@ class ClickableElementRequest(BaseModel):
     url:str
     query:str
     topk:int=10
+
+class PodcastRequest(BaseModel):
+    text: str
+    prompt: str = None  # Optional theme for the podcast
 
 @app.post('/clickable-elements', operation_id="get_website_structure")
 async def get_website_structure(request: ClickableElementRequest):
@@ -381,6 +388,69 @@ Agent Shorthand: {request.toolsshorthand}
     )
     return result.content
 
+@app.post('/text-to-podcast', operation_id="get_podcast")
+async def podcaster(request: PodcastRequest):
+    """
+    Converts a list of sentences with specified voices into a podcast audio file.
+    Each sentence is spoken in the specified voice, and random pauses are added between sentences for natural flow.
+    
+    Args:
+        prompt: The theme or topic of the podcast episode.
+        text: The detailed content over which the podcast is to be made.
+    Returns:
+        FileResponse: The generated podcast .wav file. or str
+    """
+    system_prompt = f"""You are an experienced podcaster who can create engaging episodes on any topic.
+Your style makes complex concepts simple, clear, and enjoyable to listen to.
+
+When writing scripts:
+
+Use natural, conversational language.
+
+Avoid special characters (like *, #, etc.) and TTS markup (such as <prosody> tags).
+
+Do not include background descriptions or stage directions.
+
+Always stay on the provided theme (if one is given). If no theme is provided, use the given text to generate engaging, informative content.
+
+The podcast script should be formatted as follows:
+
+<podcast>
+[Person1] What Person1 says [Person2] What Person2 says ...
+</podcast>
+
+
+Where each [Person] represents a speaker, followed by their dialogue.
+
+Theme: {request.prompt}
+Text: {request.text}
+"""
+
+    result = await llm.ainvoke(
+        system_prompt
+    )
+    voice_choices = ["af_sarah","am_michael","am_adam","am_eric","am_echo","am_puck"]
+    podcast_segments = await parse_podcast(result.content, voice_choices)
+
+    try:
+        if os.path.exists("output/podcasts") is False:
+            os.makedirs("output/podcasts")
+        file_path = f"output/podcasts/podcast_{str(uuid4())[:8]}.wav"
+        _ = await podcasting(podcast_segments, filename=file_path)
+        logger.info(f"Current working directory: {os.getcwd()}")
+        
+        logger.info(f"Podcast file created at: {file_path}")
+        try:
+            return FileResponse(
+            file_path,
+            media_type="audio/wav",
+            filename=os.path.basename(file_path)
+            )
+        except:
+            return f"Generated podcast and stored at {file_path}"
+    except Exception as e:
+        return {"error": f"Error occurred while creating podcast: {e}"}
+
 mcp = FastApiMCP(app,include_operations=['get_web_search',
                                          'get_web_summarize',
                                          'get_youtube_search',
@@ -390,7 +460,8 @@ mcp = FastApiMCP(app,include_operations=['get_web_search',
                                          "get_git_search",
                                          "get_local_folder_tree",
                                          "get_response_check",
-                                         "get_website_structure"
+                                         "get_website_structure",
+                                         "get_podcast"
                                          ],)
 mcp.mount()
 
