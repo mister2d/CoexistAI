@@ -7,7 +7,9 @@ logger = logging.getLogger(__name__)
 import numpy as np
 import soundfile as sf
 import asyncio
-
+import re
+import os
+from uuid import uuid4
 from kokoro_onnx import Kokoro
 
 def random_pause(min_duration=0.5, max_duration=2.0, sample_rate=None):
@@ -17,8 +19,6 @@ def random_pause(min_duration=0.5, max_duration=2.0, sample_rate=None):
     silence_duration = random.uniform(min_duration, max_duration)
     silence = np.zeros(int(silence_duration * sample_rate))
     return silence
-
-import re
 
 async def parse_podcast(text: str, voice_choices:list) -> list[dict]:
     """
@@ -65,7 +65,6 @@ async def parse_podcast(text: str, voice_choices:list) -> list[dict]:
     logger.info(f"Parsed podcast segments: {result}")
     return result
 
-
 async def podcasting(sentences, filename):
     """
     Generate a podcast audio file from the given sentences.
@@ -97,3 +96,60 @@ async def podcasting(sentences, filename):
         logger.info(f"Created {filename}")
     except Exception as e:
         logger.error(f"Error occurred while creating podcast: {e}")
+
+async def text_to_speech(text, voice, filename, lang):
+    """
+    Convert text to speech using the specified voice and save it to a file.
+    """
+    kokoro = Kokoro("kokoro-v1.0.onnx", "voices-v1.0.bin")
+    samples, sample_rate = kokoro.create(
+        text, voice=voice, speed=1.0, lang=lang
+    )
+    try:
+        sf.write(filename, samples, sample_rate)
+        return filename
+    except Exception as e:
+        logger.error(f"Error occurred while saving audio file: {e}")
+        
+async def podcasting_from_text(text,theme,llm):
+    system_prompt = f"""You are an experienced podcaster who can create engaging episodes on any topic.
+    Your style makes complex concepts simple, clear, and enjoyable to listen to.
+    
+    When writing scripts:
+    
+    Use natural, conversational language.
+    
+    Avoid special characters (like *, #, etc.) and TTS markup (such as <prosody> tags).
+    
+    Do not include background descriptions or stage directions.
+    
+    Always stay on the provided theme (if one is given). If no theme is provided, use the given text to generate engaging, informative content.
+    
+    The podcast script should be formatted as follows:
+    
+    <podcast>
+    [Person1] What Person1 says [Person2] What Person2 says ...
+    </podcast>
+    
+    
+    Where each [Person] represents a speaker, followed by their dialogue.
+    
+    Theme: {theme}
+    Text: {text}
+    """
+    result = await llm.ainvoke(
+            system_prompt
+            )
+    voice_choices = ["af_heart","am_michael","am_adam","am_eric","am_echo","am_puck",
+                     "am_fenrir","am_santa","am_liam","af_river"
+                     ]
+    podcast_segments = await parse_podcast(result.content, voice_choices)
+
+    if os.path.exists("output/podcasts") is False:
+        os.makedirs("output/podcasts")
+    
+    file_path = f"output/podcasts/podcast_{str(uuid4())[:8]}.wav"
+    _ = await podcasting(podcast_segments, filename=file_path)
+    print(f"Current working directory: {os.getcwd()}")
+    print(f"Podcast file created at: {file_path}")
+    return file_path
