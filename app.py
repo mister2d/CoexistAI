@@ -153,8 +153,14 @@ class ClickableElementRequest(BaseModel):
     topk:int=10
 
 class PodcastRequest(BaseModel):
-    text: str
+    text: str = None
     prompt: str = None  # Optional theme for the podcast
+
+class BasicTTSRequest(BaseModel):
+    text: str = None
+    voice: str = "am_santa"
+    lang: str = "en-us"
+    filename: str = ""
 
 @app.post('/clickable-elements', operation_id="get_website_structure")
 async def get_website_structure(request: ClickableElementRequest):
@@ -429,7 +435,9 @@ Text: {request.text}
     result = await llm.ainvoke(
         system_prompt
     )
-    voice_choices = ["af_sarah","am_michael","am_adam","am_eric","am_echo","am_puck"]
+    voice_choices = ["af_heart","am_michael","am_adam","am_eric","am_echo","am_puck",
+                     "am_fenrir","am_santa","am_liam","af_river"
+                     ]
     podcast_segments = await parse_podcast(result.content, voice_choices)
 
     try:
@@ -451,6 +459,30 @@ Text: {request.text}
     except Exception as e:
         return {"error": f"Error occurred while creating podcast: {e}"}
 
+@app.post('/basic-tts', operation_id="get_basic_tts")
+async def basic_tts(request: BasicTTSRequest):
+    text = request.text
+    voice = request.voice
+    lang = request.lang
+    filename = request.filename
+
+    if not filename:
+        filename = f"output/basic_tts_{str(uuid4())[:8]}.wav"
+
+    if not text:
+        return {"error": "Text is required for TTS."}
+
+    try:
+        await text_to_speech(text, voice, filename, lang)
+        return FileResponse(
+            filename,
+            media_type="audio/wav",
+            filename=os.path.basename(filename)
+        )
+    except Exception as e:
+        return {"error": f"Error occurred while creating TTS: {e}"}
+
+
 mcp = FastApiMCP(app,include_operations=['get_web_search',
                                          'get_web_summarize',
                                          'get_youtube_search',
@@ -461,7 +493,8 @@ mcp = FastApiMCP(app,include_operations=['get_web_search',
                                          "get_local_folder_tree",
                                          "get_response_check",
                                          "get_website_structure",
-                                         "get_podcast"
+                                         "get_podcast",
+                                         "get_basic_tts"
                                          ],)
 mcp.mount()
 
