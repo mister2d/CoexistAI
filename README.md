@@ -16,7 +16,7 @@ Example: I Converted https://www.theatlantic.com/newsletters/archive/2025/08/ai-
 to podcast: 
 
 <audio controls>
-  <source src="https://github.com/SPThole/CoexistAI/raw/refs/heads/main/output/podcasts/podcast_58fc33d6.wav" type="audio/wav" />
+  <source src="https://github.com/SPThole/CoexistAI/releases/download/v1.0.0/podcast_58fc33d6.wav" type="audio/wav">
   Your browser does not support the audio element.
 </audio>
 
