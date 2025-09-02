@@ -14,7 +14,11 @@ CoexistAI is a modular, developer-friendly research assistant framework. It enab
 
 Example: I Converted https://www.theatlantic.com/newsletters/archive/2025/08/ai-high-school-college/684057/ article 
 to podcast: 
-[🎧 Listen to podcast](output/podcasts/podcast_58fc33d6.wav)
+
+<audio controls>
+  <source src="https://github.com/SPThole/CoexistAI/raw/refs/heads/main/output/podcasts/podcast_58fc33d6.wav" type="audio/mpeg" />
+  Your browser does not support the audio element.
+</audio>
 
 ## 🔔 New Updates: Read More about updates [Here](README_MCP.md)
 
