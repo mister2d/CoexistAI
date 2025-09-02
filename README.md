@@ -14,7 +14,7 @@ CoexistAI is a modular, developer-friendly research assistant framework. It enab
 
 Example: I Converted https://www.theatlantic.com/newsletters/archive/2025/08/ai-high-school-college/684057/ article 
 to podcast: 
-[🎧 Listen to podcast] (documents/podcast_58fc33d6.wav)
+[🎧 Listen to podcast](documents/podcast_58fc33d6.wav)
 
 ## 🔔 New Updates: Read More about updates [Here](README_MCP.md)
 
