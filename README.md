@@ -9,8 +9,8 @@ CoexistAI is a modular, developer-friendly research assistant framework. It enab
 ## 🎙️ Now Supporting Vibe Podcasting & Speech-to-Text!
 
 - **Text → Podcast**: Instantly turn any written content into engaging podcast episodes—ideal for on-the-go listening or repurposing your articles, notes, or blogs.
--**Text → Speech**: Convert text into high-quality audio using advanced TTS technology. Check out the [Notebook] (coexist_tutorial.ipynb) for usage examples.
--**Flexible Integration**: Whether through FastAPI or MCP, you can generate audio files seamlessly—integrate with your agents or use as a standalone feature.
+- **Text → Speech**: Convert text into high-quality audio using advanced TTS technology. Check out the [Notebook] (coexist_tutorial.ipynb) for usage examples.
+- **Flexible Integration**: Whether through FastAPI or MCP, you can generate audio files seamlessly—integrate with your agents or use as a standalone feature.
 
 Example: I converted [this article](https://www.theatlantic.com/newsletters/archive/2025/08/ai-high-school-college/684057/) to a podcast.  
 **[Listen to the podcast here](output/podcasts/podcast_58fc33d6.wav)**
