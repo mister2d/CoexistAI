@@ -12,11 +12,9 @@ CoexistAI is a modular, developer-friendly research assistant framework. It enab
 -**Text → Speech**: Convert text into high-quality audio using advanced TTS technology. Check out the [Notebook] (coexist_tutorial.ipynb) for usage examples.
 -**Flexible Integration**: Whether through FastAPI or MCP, you can generate audio files seamlessly—integrate with your agents or use as a standalone feature.
 
-Example: I Converted https://www.theatlantic.com/newsletters/archive/2025/08/ai-high-school-college/684057/ article 
-to podcast: 
-
+Example: I converted [this article](https://www.theatlantic.com/newsletters/archive/2025/08/ai-high-school-college/684057/) to a podcast:  
 <audio controls>
-  <source src="https://github.com/SPThole/CoexistAI/releases/download/v1.0.0/podcast_58fc33d6.wav" type="audio/wav">
+  <source src="output/podcasts/podcast_58fc33d6.wav" type="audio/wav">
   Your browser does not support the audio element.
 </audio>
 
