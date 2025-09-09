@@ -1,0 +1,82 @@
+# Core FastAPI and web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# LLM and AI integrations
+openai==1.3.7
+google-generativeai==0.3.2
+transformers==4.35.2
+torch==2.1.1
+sentence-transformers==2.2.2
+
+# Web scraping and search
+requests==2.31.0
+beautifulsoup4==4.12.2
+selenium==4.15.2
+newspaper3k==0.2.8
+youtube-transcript-api==0.6.1
+yt-dlp==2023.11.16
+
+# Data processing and embeddings
+numpy==1.24.3
+pandas==2.1.3
+scikit-learn==1.3.2
+langchain==0.0.340
+chromadb==0.4.17
+
+# Text processing
+nltk==3.8.1
+spacy==3.7.2
+tiktoken==0.5.1
+tokenizers==0.15.0
+
+# Reddit integration
+praw==7.7.1
+
+# Map and location services
+geopy==2.4.0
+geopandas==0.14.1
+folium==0.15.0
+
+# Audio and TTS
+gTTS==2.4.0
+pydub==0.25.1
+librosa==0.10.1
+soundfile==0.12.1
+
+# Git integration
+GitPython==3.1.40
+
+# Utilities
+python-dotenv==1.0.0
+python-multipart==0.0.6
+aiofiles==23.2.1
+httpx==0.25.2
+tenacity==8.2.3
+tqdm==4.66.1
+
+# Development and debugging
+rich==13.7.0
+typer==0.9.0
+
+# FastAPI MCP integration
+fastapi-mcp==0.1.0
+
+# CORS and middleware
+starlette==0.27.0
+
+# Date and time handling
+python-dateutil==2.8.2
+pytz==2023.3.post1
+
+# Environment and configuration
+pyyaml==6.0.1
+toml==0.10.2
+
+# Logging and monitoring
+structlog==23.2.0
+
+# Image processing (for potential future use)
+Pillow==10.1.0
+opencv-python==4.8.1.78
