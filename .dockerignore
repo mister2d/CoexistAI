@@ -1,0 +1,182 @@
+# CoexistAI .dockerignore
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# Docker
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+parts/
+develop-eggs/
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-workspace
+*.sublime-project
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+logs/
+*.log
+log/
+logging/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Output directories (these are mounted as volumes)
+output/
+output/basic_tts/
+output/podcasts/
+artifacts/
+documents/
+
+# Large model files (these should be downloaded in container)
+.huggingface/
+.cache/huggingface/
+*.bin
+*.safetensors
+*.msgpack
+*.h5
+*.onnx
+*.pkl
+*.joblib
+*.model
+*.pt
+*.pth
+*.ckpt
+
+# Audio files (generated content)
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg
+
+# Documentation and markdown files (not needed in container)
+*.md
+!README.md
+!README_MCP.md
+docs/
+documentation/
+
+# Test files
+test_*.py
+*_test.py
+tests/
+test/
+testing/
+
+# Jupyter notebooks
+*.ipynb
+.ipynb_checkpoints
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# Cache directories
+.cache/
+*.cache
+
+# SearxNG cache (if exists)
+searxng/__pycache__/
+searxng/*.pyc
+
+# Development scripts
+quick_setup.sh
+setup.py
+setup.cfg
+
+# License files (not needed in container)
+LICENSE*
+COPYING*
+NOTICE*
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+Jenkinsfile
+azure-pipelines.yml
+
+# Security and key files
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+secrets/

@@ -1,0 +1,145 @@
+services:
+  # SearxNG search engine
+  searxng:
+    image: searxng/searxng:latest
+    container_name: coexistai-searxng
+    restart: unless-stopped
+    ports:
+      - "8085:8080"
+    volumes:
+      - ./config/searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BIND_ADDRESS=0.0.0.0
+      - SEARXNG_PORT=8080
+      - SEARXNG_BASE_URL=http://searxng:8080/
+      - SEARXNG_INSTANCE_NAME=coexistai-search
+    networks:
+      - coexistai-network
+    profiles:
+      - searxng
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Infinity embedding server (optional, for local embeddings)
+  infinity-emb:
+    image: michaelf34/infinity:0.0.77-trt-onnx
+    container_name: coexistai-infinity
+    restart: unless-stopped
+    ports:
+      - "7997:7997"
+    environment:
+      - INFINITY_MODEL_ID=nomic-ai/nomic-embed-text-v1
+      - INFINITY_DEVICE=cpu
+      - INFINITY_PORT=7997
+    networks:
+      - coexistai-network
+    profiles:
+      - with-infinity
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7997/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # CoexistAI application for OpenAI-compatible endpoints
+  coexistai-openai:
+    build:
+      context: ..
+      dockerfile: config/Dockerfile
+    container_name: coexistai-openai
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      # OpenAI-compatible configuration
+      - LLM_TYPE=others
+      - LLM_MODEL_NAME=gpt-4o-mini
+      - OPENAI_API_BASE=https://openrouter.ai/api/v1
+      - LLM_API_KEY=${OPENAI_API_KEY}
+      # Embedding with OpenAI
+      - EMBEDDING_MODEL_NAME=text-embedding-3-small
+      - EMBED_MODE=infinity_emb
+      - EMBED_API_KEY=${OPENAI_API_KEY}
+      - INFINITY_EMB_URL=http://coexistai-infinity:7997
+      # Other settings same as main service
+      - PORT=8000
+      - HOST=0.0.0.0
+      - SEARXNG_HOST=${SEARXNG_HOST}
+      - SEARXNG_PORT=443
+      - SEARXNG_PROTOCOL=https
+      - PLACE=${PLACE}
+      # HuggingFace cache configuration
+      - HF_HOME=/app/.cache/huggingface
+    volumes:
+      - ./documents:/app/documents:rw
+      - ./output:/app/output:rw
+    networks:
+      - coexistai-network
+    depends_on:
+      infinity-emb:
+        condition: service_healthy
+    profiles:
+      - openai
+
+# CoexistAI application for Google services
+  coexistai:
+    build:
+      context: ..
+      dockerfile: config/Dockerfile
+    container_name: coexistai-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # 12-factor configuration via environment variables
+      - PORT=8000
+      - HOST=0.0.0.0
+      - LOG_LEVEL=INFO
+      # SearxNG configuration
+      - SEARXNG_HOST=${SEARXNG_HOST}
+      - SEARXNG_PORT=443
+      - SEARXNG_PROTOCOL=https
+      - WAIT_FOR_SERVICES=searxng:8080
+      # LLM Configuration - Google Gemini (default)
+      - LLM_TYPE=google
+      - LLM_MODEL_NAME=gemini-2.0-flash
+      - LLM_TEMPERATURE=0.1
+      - LLM_MAX_TOKENS=
+      - LLM_TIMEOUT=
+      - LLM_MAX_RETRIES=2
+      - LLM_API_KEY=${GOOGLE_API_KEY:-DUMMY}  # Set your API key in .env file
+      # Embedding Configuration
+      - EMBEDDING_MODEL_NAME=models/embedding-001
+      - EMBED_MODE=google
+      - EMBED_API_KEY=${GOOGLE_API_KEY:-DUMMY}
+      - CROSS_ENCODER_NAME=BAAI/bge-reranker-base
+      # Infinity embedding server (if using local embeddings)
+      - INFINITY_EMB_URL=http://infinity-emb:7997
+      # Geographic location for personalized results
+      - PLACE=${PLACE}
+    volumes:
+      - ./documents:/app/documents:rw
+      - ./output:/app/output:rw
+      - ./config/searxng:/app/searxng:ro
+    networks:
+      - coexistai-network
+    depends_on:
+      searxng:
+        condition: service_healthy
+    profiles:
+      - google
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  coexistai-network:
+    driver: bridge

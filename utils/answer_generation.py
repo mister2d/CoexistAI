@@ -74,7 +74,7 @@ async def query_agent(query, llm, date, day):
     except Exception as e:
         logger.warning(f"Structured output failed: {e}. Falling back to prompt-based extraction.")
         try:
-            prompt = prompts['query_agent_basic'].format(date=date, day=day, query=query)
+            prompt = prompts['query_agent_basic'].format(date=date, day=day, location=location, query=query)
             response = await llm.ainvoke(prompt)
             response = response.content
             response = extract_subqueries(response.text)

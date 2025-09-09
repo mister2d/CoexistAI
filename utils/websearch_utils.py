@@ -67,15 +67,24 @@ class SearchWeb:
         searcher (SearxSearchWrapper): An instance of SearxSearchWrapper for querying search engines.
     """
 
-    def __init__(self, port, host="localhost"):
+    def __init__(self, port=None, host=None):
         """
-        Initializes the SearchWeb class with the given Searx server port.
+        Initializes the SearchWeb class with the given Searx server configuration.
+        Uses environment variables if available, otherwise falls back to provided parameters.
 
         Args:
-            port (int): The port number for Searx search service.
-            host (str): The host address for Searx search service.
+            port (int, optional): The port number for Searx search service. Defaults to None.
+            host (str, optional): The host address for Searx search service. Defaults to None.
         """
-        self.searcher = SearxSearchWrapper(searx_host=f"http://{host}:{port}")
+        import os
+        # Use environment variables if available, otherwise use provided parameters or defaults
+        searxng_host = os.environ.get('SEARXNG_HOST', host or 'localhost')
+        searxng_port = os.environ.get('SEARXNG_PORT', str(port) if port else '8085')
+        searxng_protocol = os.environ.get('SEARXNG_PROTOCOL', 'http')
+        
+        searx_host_url = f"{searxng_protocol}://{searxng_host}:{searxng_port}"
+        logger.info(f"Initializing SearchWeb with SearxNG at: {searx_host_url}")
+        self.searcher = SearxSearchWrapper(searx_host=searx_host_url)
 
     def query_search(self, query, engines=['google'], num_results=5):
         """
@@ -116,7 +125,9 @@ class SearchWeb:
             if 'github.com' in url:
                 url = url.replace('github', 'raw.githubusercontent')
             
-            headers = {"User-Agent": "Mozilla/5.0"}
+            # Use USER_AGENT from environment if available, otherwise use default
+            user_agent = os.environ.get('USER_AGENT', 'Mozilla/5.0 (CoexistAI/1.0)')
+            headers = {"User-Agent": user_agent}
             response = requests.get(url, timeout=15, headers=headers)
             response.raise_for_status()
 

@@ -40,7 +40,11 @@ if not logger.hasHandlers():
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-os.environ["GOOGLE_API_KEY"] = os.environ.get("GOOGLE_API_KEY", "")
+# Set Google API key from environment with better error handling
+google_api_key = os.environ.get("GOOGLE_API_KEY", "")
+if not google_api_key:
+    logger.warning("GOOGLE_API_KEY environment variable not set. Google services may not work properly.")
+os.environ["GOOGLE_API_KEY"] = google_api_key
 
 def set_logging(enabled: bool):
     """
@@ -72,14 +76,23 @@ def set_logging(enabled: bool):
         handler.setFormatter(formatter)
         root_logger.addHandler(handler)
 
-def is_searxng_running():
-       result = subprocess.run(
-              ["docker", "ps", "--filter", "ancestor=searxng/searxng", "--format", "{{.ID}}"],
-              stdout=subprocess.PIPE,
-              stderr=subprocess.PIPE,
-              text=True
-       )
-       return bool(result.stdout.strip())
+def check_service_health(service_url, service_name="service", timeout=5):
+    """
+    Simple HTTP health check for external services.
+    Returns True if service is healthy, False otherwise.
+    This replaces the Docker-in-Docker orchestration approach.
+    """
+    try:
+        response = requests.get(f"{service_url}/health", timeout=timeout)
+        if response.status_code == 200:
+            logger.info(f"{service_name} is healthy at {service_url}")
+            return True
+        else:
+            logger.warning(f"{service_name} returned status code: {response.status_code}")
+            return False
+    except Exception as e:
+        logger.warning(f"{service_name} is not available at {service_url}: {e}")
+        return False
    
 def fix_json(json_str):
     """
@@ -123,40 +136,32 @@ def load_model(model_name,
 
     hf_embeddings = None
     if _embed_mode == 'infinity_emb':
-        infinity_api_url = "http://0.0.0.0:7997"
-        # Check if the Infinity API server is running
+        infinity_api_url = os.environ.get('INFINITY_EMB_URL', 'http://localhost:7997')
+        logger.info(f"Using Infinity API URL from environment: {infinity_api_url}")
+        # Simple health check - no orchestration
         try:
             response = requests.get(f"{infinity_api_url}/health", timeout=2)
             if response.status_code != 200:
-                raise Exception("Infinity API health check failed")
-        except Exception:
-            logger.info("Infinity API not running. Attempting to start it...")
-            try:
-                subprocess.Popen(
-                    [os.path.join(os.path.dirname(__file__), "..", "infinity_env", "bin", "infinity_emb"), "v2", "--model-id", model_name],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                # Wait a few seconds for the server to start
-                time.sleep(30)
-                # Check again if the Infinity API server is running after attempting to start it
-                try:
-                    response = requests.get(f"{infinity_api_url}/health", timeout=2)
-                    if response.status_code != 200:
-                        raise Exception("Infinity API health check failed after start attempt")
-                except Exception:
-                    logger.error("Infinity API still not running after start attempt.")
-                    raise RuntimeError("Infinity API failed to start or is not reachable at http://0.0.0.0:7997")
-            except Exception as e:
-                logger.error(f"Failed to start Infinity API: {e}")
-                raise RuntimeError(f"Failed to start Infinity API: {e}")
+                logger.warning("Infinity API health check failed - service may not be available")
+                logger.info("Consider running Infinity API as a separate service or using a different embedding mode")
+                # Don't fail - allow graceful degradation
+        except Exception as e:
+            logger.warning(f"Infinity API not available at {infinity_api_url}: {e}")
+            logger.info("Infinity API should be run as a separate service when using infinity_emb mode")
+            logger.info("Consider using 'huggingface' or 'google' embedding mode instead")
+            # Don't fail - allow graceful degradation or fallback
+            # The application can continue without embeddings if needed
+        
         try:
             hf_embeddings = InfinityEmbeddings(
                 model=model_name, infinity_api_url=infinity_api_url
             )
         except Exception as e:
             logger.error(f"Failed to load InfinityEmbeddings: {e}")
-            raise RuntimeError(f"Failed to load InfinityEmbeddings: {e}, please first start the server using infinity_emb v2 --model-id (https://github.com/michaelfeil/infinity)")
+            logger.info("To use infinity_emb mode, ensure Infinity API server is running separately")
+            logger.info("Alternative: Use 'huggingface' or 'google' embedding mode instead")
+            # Allow graceful degradation - don't raise exception
+            hf_embeddings = None
     elif _embed_mode == 'huggingface':
         try:
             extra_kwargs = {'trust_remote_code': True}
@@ -176,10 +181,33 @@ def load_model(model_name,
             logger.error(f"Failed to load GoogleGenerativeAIEmbeddings: {e}")
             raise RuntimeError(f"Failed to load GoogleGenerativeAIEmbeddings: {e}")
 
+    # Add diagnostic logging for HuggingFace cache directory
+    import getpass
+    home_dir = os.path.expanduser("~")
+    cache_dir = os.path.join(home_dir, ".cache", "huggingface")
+    logger.info(f"Current user: {getpass.getuser()}")
+    logger.info(f"Home directory: {home_dir}")
+    logger.info(f"HuggingFace cache directory: {cache_dir}")
+    logger.info(f"Cache directory exists: {os.path.exists(cache_dir)}")
+    if os.path.exists(cache_dir):
+        logger.info(f"Cache directory permissions: {oct(os.stat(cache_dir).st_mode)}")
+        logger.info(f"Cache directory owner: {os.stat(cache_dir).st_uid}:{os.stat(cache_dir).st_gid}")
+    
     try:
+        # Set HuggingFace cache directory to a writable location
+        os.environ["HF_HOME"] = "/app/.cache/huggingface"
+        
+        # Ensure the cache directory exists with proper permissions
+        hf_cache_dir = "/app/.cache/huggingface"
+        os.makedirs(hf_cache_dir, exist_ok=True)
+        logger.info(f"Using HuggingFace cache directory: {hf_cache_dir}")
+        
         cross_encoder = HuggingFaceCrossEncoder(model_name=cross_encoder_name)
     except Exception as e:
         logger.error(f"Failed to load HuggingFaceCrossEncoder: {e}")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Current working directory: {os.getcwd()}")
+        logger.error(f"Directory permissions for /app: {oct(os.stat('/app').st_mode) if os.path.exists('/app') else 'N/A'}")
         raise RuntimeError(f"Failed to load HuggingFaceCrossEncoder: {e}")
 
     if hf_embeddings is None:
@@ -244,10 +272,21 @@ def get_generative_model(model_name='gemini-1.5-flash',
     if kwargs is None:
         kwargs = {}
     if type == 'google':
-        extra_kwargs = {'generation_config': {"response_mime_type": "application/json"}}
-        kwargs = {**kwargs, **extra_kwargs}
+        # Handle generation_config properly for Google Generative AI
+        # Remove generation_config from kwargs if present to avoid warnings
+        if 'generation_config' in kwargs:
+            generation_config = kwargs.pop('generation_config')
+            logger.info(f"Using custom generation_config: {generation_config}")
+        
+        # Set up Google API credentials properly
+        google_api_key = kwargs.get('api_key', os.environ.get('GOOGLE_API_KEY', ''))
+        if not google_api_key:
+            logger.error("Google API key is required but not provided. Set GOOGLE_API_KEY environment variable.")
+            raise ValueError("Google API key is required for Google LLM type")
+        
         llm = ChatGoogleGenerativeAI(
             model=model_name,
+            google_api_key=google_api_key,
             **kwargs,
         )
     elif type == 'local':

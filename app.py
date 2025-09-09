@@ -1,6 +1,6 @@
 from utils.websearch_utils import *
 from utils.reddit_utils import *
-from utils.map import * 
+from utils.map import *
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from utils.utils import *
@@ -14,9 +14,50 @@ import json
 import os
 import atexit
 from model_config import *
+
+# Startup configuration validation
+def validate_environment_config():
+    """Validate and log all environment variable configurations"""
+    logger.info("=== Environment Configuration Validation ===")
+    
+    # SearxNG configuration
+    searxng_host = os.environ.get('SEARXNG_HOST', 'not set')
+    searxng_port = os.environ.get('SEARXNG_PORT', 'not set')
+    searxng_protocol = os.environ.get('SEARXNG_PROTOCOL', 'not set')
+    logger.info(f"SearxNG Config - Host: {searxng_host}, Port: {searxng_port}, Protocol: {searxng_protocol}")
+    
+    # Application configuration
+    app_port = os.environ.get('PORT', 'not set')
+    app_host = os.environ.get('HOST', 'not set')
+    logger.info(f"App Config - Host: {app_host}, Port: {app_port}")
+    
+    # LLM configuration
+    llm_type = os.environ.get('LLM_TYPE', 'not set')
+    llm_model = os.environ.get('LLM_MODEL_NAME', 'not set')
+    google_api_key = os.environ.get('GOOGLE_API_KEY', 'not set')
+    openai_api_key = os.environ.get('OPENAI_API_KEY', 'not set')
+    logger.info(f"LLM Config - Type: {llm_type}, Model: {llm_model}")
+    logger.info(f"API Keys - Google: {'set' if google_api_key else 'not set'}, OpenAI: {'set' if openai_api_key else 'not set'}")
+    
+    # Embedding configuration
+    embed_mode = os.environ.get('EMBED_MODE', 'not set')
+    embedding_model = os.environ.get('EMBEDDING_MODEL_NAME', 'not set')
+    logger.info(f"Embedding Config - Mode: {embed_mode}, Model: {embedding_model}")
+    
+    # Other configuration
+    user_agent = os.environ.get('USER_AGENT', 'not set')
+    place = os.environ.get('PLACE', 'not set')
+    log_level = os.environ.get('LOG_LEVEL', 'not set')
+    logger.info(f"Other Config - User Agent: {user_agent}, Place: {place}, Log Level: {log_level}")
+    
+    logger.info("=== Configuration Validation Complete ===")
+
+# Run configuration validation at startup
+validate_environment_config()
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from uuid import uuid4
+import requests
 
 
 # Use config values for model and embedding paths
@@ -40,20 +81,30 @@ embed_mode = model_config.get("embed_mode", "gemini")
 cross_encoder_name = model_config.get("cross_encoder_name", "BAAI/bge-reranker-base")
 
 
-if not is_searxng_running():
-    subprocess.run([
-        "docker", "run", "-d",
-        "--name", "searxng",
-        "-p", f"{PORT_NUM_SEARXNG}:8080",
-        "-v", f"{os.getcwd()}/searxng:/etc/searxng:rw",
-        "-e", f"SEARXNG_BASE_URL=http://{HOST_SEARXNG}:{PORT_NUM_SEARXNG}/",
-        "-e", f"SEARXNG_PORT={PORT_NUM_SEARXNG}",
-        "-e", f"SEARXNG_BIND_ADDRESS={HOST_SEARXNG}",
-        "--restart", "unless-stopped",
-        "searxng/searxng:latest"
-    ])
+logger.info("Checking SearxNG service availability...")
+# Use the new service health check function instead of Docker orchestration
+from utils.utils import check_service_health
+
+# Debug: Log environment variables for SearxNG
+logger.info(f"Environment variables - SEARXNG_HOST: {os.environ.get('SEARXNG_HOST', 'not set')}")
+logger.info(f"Environment variables - SEARXNG_PORT: {os.environ.get('SEARXNG_PORT', 'not set')}")
+logger.info(f"Environment variables - SEARXNG_PROTOCOL: {os.environ.get('SEARXNG_PROTOCOL', 'not set')}")
+logger.info(f"Hardcoded values - HOST_SEARXNG: {HOST_SEARXNG}, PORT_NUM_SEARXNG: {PORT_NUM_SEARXNG}")
+
+# Use environment variables if available, otherwise fall back to hardcoded values
+searxng_host = os.environ.get('SEARXNG_HOST', HOST_SEARXNG)
+searxng_port = os.environ.get('SEARXNG_PORT', PORT_NUM_SEARXNG)
+searxng_protocol = os.environ.get('SEARXNG_PROTOCOL', 'http')
+
+searxng_health_url = f"{searxng_protocol}://{searxng_host}:{searxng_port}"
+logger.info(f"Attempting to connect to SearxNG at: {searxng_health_url}")
+
+if check_service_health(searxng_health_url, "SearxNG"):
+    logger.info("SearxNG service is available and healthy")
 else:
-    print("SearxNG docker container is already running.")
+    logger.warning("SearxNG service is not available")
+    logger.warning("Web search functionality will be disabled or limited")
+    logger.info("This is expected when SearxNG is not running as a separate service")
 
 llm = get_generative_model(
     model_name=llm_model_name,

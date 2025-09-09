@@ -1,3 +1,5 @@
+import os
+
 prompts = {
 
 'youtube_summary_prompt':"""Analyze and respond the task using the given transcript in detail, following these guidelines:
@@ -68,7 +70,7 @@ Dict[
 ]
 """,
 
-"query_agent_basic":"""Context: Today's date is {date}, Bangalore, India.
+"query_agent_basic":"""Context: Today's date is {date}, {location}.
 
 Instructions:
 
@@ -173,6 +175,7 @@ You are given with context, which has real time data, never say that you dont ha
 
 }
 
-place = 'Bangalore, India'
+place = os.environ.get('PLACE', 'UTC')
+location = os.environ.get('LOCATION', 'Local Area')
 
 
