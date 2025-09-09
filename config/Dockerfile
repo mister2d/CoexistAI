@@ -18,14 +18,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set working directory
 WORKDIR /build
 
-# Copy requirements first for better caching
-COPY config/requirements.txt .
+# Copy Poetry files first for better caching
+COPY pyproject.toml poetry.lock ./
 
-# Create virtual environment and install dependencies
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Poetry using the official installer for better reliability
+RUN curl -sSL https://install.python-poetry.org | python3 - && \
+    /root/.local/bin/poetry config virtualenvs.create true && \
+    /root/.local/bin/poetry config virtualenvs.path /opt/venv && \
+    /root/.local/bin/poetry install --only=main --no-root
+
+# Set PATH to include Poetry and virtual environment
+ENV PATH="/root/.local/bin:/opt/venv/bin:$PATH"
 
 # Runtime stage
 FROM python:3.11-slim

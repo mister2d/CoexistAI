@@ -1,0 +1,106 @@
+[tool.poetry]
+name = "coexistai"
+version = "1.0.0"
+description = "CoexistAI - Multi-modal AI research assistant with web search, Reddit, maps, and more"
+authors = ["CoexistAI Team <team@coexistai.com>"]
+readme = "README.md"
+packages = [{include = "app.py"}, {include = "utils"}, {include = "config"}]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.14"
+
+# Core FastAPI and web framework
+fastapi = "^0.116.1"
+uvicorn = {extras = ["standard"], version = "^0.24.0"}
+pydantic = "^2.10.6"
+
+# LLM and AI integrations
+openai = "^1.60.0"
+google-generativeai = "^0.3.2"
+transformers = "^4.35.2"
+torch = "^2.8.0"
+sentence-transformers = "^3.0.0"
+
+# Web scraping and search
+requests = "^2.31.0"
+beautifulsoup4 = "^4.12.2"
+selenium = "^4.15.2"
+newspaper3k = "^0.2.8"
+youtube-transcript-api = "^0.6.1"
+yt-dlp = "^2023.11.16"
+
+# Data processing and embeddings
+numpy = "^1.26.4"
+pandas = "^2.2.3"
+scikit-learn = "^1.7.2"
+langchain = "^0.3.27"
+chromadb = "^0.5.0"
+
+# Text processing
+nltk = "^3.8.1"
+spacy = "^3.7.5"
+tiktoken = "^0.5.1"
+tokenizers = "^0.15.0"
+
+# Reddit integration
+praw = "^7.7.1"
+
+# Map and location services
+geopy = "^2.4.0"
+geopandas = "^0.14.4"
+folium = "^0.15.0"
+
+# Audio and TTS
+gTTS = "^2.4.0"
+pydub = "^0.25.1"
+librosa = "^0.10.1"
+soundfile = "^0.12.1"
+
+# Git integration
+GitPython = "^3.1.40"
+
+# Utilities
+python-dotenv = "^1.0.0"
+python-multipart = "^0.0.9"
+aiofiles = "^23.2.1"
+httpx = "^0.28.0"
+tenacity = "^8.2.3"
+tqdm = "^4.66.1"
+
+# Development and debugging
+rich = "^13.7.0"
+typer = "^0.9.0"
+
+# FastAPI MCP integration
+fastapi-mcp = "^0.4.0"
+
+# CORS and middleware
+starlette = "^0.42.0"
+
+# Date and time handling
+python-dateutil = "^2.8.2"
+pytz = "^2023.3.post1"
+
+# Environment and configuration
+pyyaml = "^6.0.1"
+toml = "^0.10.2"
+
+# Logging and monitoring
+structlog = "^23.2.0"
+
+# Image processing (for potential future use)
+Pillow = "^10.1.0"
+opencv-python = "^4.8.1.78"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+black = "^23.0.0"
+flake8 = "^6.0.0"
+mypy = "^1.5.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.extras]
+dev = ["pytest", "black", "flake8", "mypy"]
