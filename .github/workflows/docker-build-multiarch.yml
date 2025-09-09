@@ -59,7 +59,7 @@ jobs:
         with:
           context: .
           file: ./config/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: [linux/amd64, linux/arm64]
+        platform: [linux/amd64]
     
     steps:
       - name: Checkout repository
@@ -162,5 +162,5 @@ jobs:
           echo "🚀 Multi-arch Docker image has been successfully built and pushed!"
           echo "📦 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
           echo "🏷️ Tags: ${{ steps.meta.outputs.tags }}"
-          echo "🔍 Platforms: linux/amd64, linux/arm64, linux/arm/v7"
+          echo "🔍 Platforms: linux/amd64"
           echo "✅ All tests passed!"

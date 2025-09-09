@@ -66,7 +66,7 @@ jobs:
         with:
           context: .
           file: ./config/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -127,5 +127,5 @@ jobs:
           echo "📦 Docker images:"
           echo "  - ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}"
           echo "  - ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          echo "🔍 Platforms: linux/amd64, linux/arm64, linux/arm/v7"
+          echo "🔍 Platforms: linux/amd64"
           echo "📋 Release notes generated and published"
