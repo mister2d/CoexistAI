@@ -1,0 +1,77 @@
+name: Test Docker Build Locally
+
+on:
+  pull_request:
+    paths:
+      - 'config/Dockerfile'
+      - 'config/requirements.txt'
+      - 'config/entrypoint.sh'
+      - '.github/workflows/docker-*'
+  workflow_dispatch:
+
+jobs:
+  test-docker-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (AMD64 only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./config/Dockerfile
+          platforms: linux/amd64
+          push: false
+          tags: coexistai:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test image locally
+        run: |
+          # Run the container
+          docker run --rm -d \
+            -e PORT=8000 \
+            -e HOST=0.0.0.0 \
+            -e LOG_LEVEL=INFO \
+            -p 8000:8000 \
+            --name test-container \
+            coexistai:test
+          
+          # Wait for container to start
+          sleep 30
+          
+          # Test health endpoint
+          curl -f http://localhost:8000/health || (docker logs test-container && exit 1)
+          
+          # Test root endpoint
+          curl -f http://localhost:8000/ || (docker logs test-container && exit 1)
+          
+          # Show logs for debugging
+          docker logs test-container
+          
+          # Clean up
+          docker stop test-container
+
+      - name: Check image size
+        run: |
+          docker images coexistai:test --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+          
+      - name: Analyze image layers
+        run: |
+          echo "=== Image Layer Analysis ==="
+          docker history coexistai:test
+          
+      - name: Security scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'coexistai:test'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
